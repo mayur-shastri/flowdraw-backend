@@ -15,12 +15,20 @@ class UserController {
             }
 
             try {
-                const createdUser = await UserService.createUser({ id: user.id });
-                res.status(201).json(createdUser);
+                const {createdUser, newCreated} = await UserService.createUser(user.id);
+                if(!createdUser) {
+                    res.status(400).json({ error: "Failed to create user" });
+                    return;
+                }
+                if(!newCreated) {
+                    res.status(201).json({createdUser, message : "Signed in successfully"});
+                }
+                else{
+                    res.status(201).json({createdUser, message : "User created successfully"});
+                }
             } catch (error) {
                 res.status(500).json({ error: "Internal server error" });
             }
-
         }
     );
 };

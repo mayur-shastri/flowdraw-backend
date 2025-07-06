@@ -3,13 +3,13 @@ import supabaseAdmin from "../utils/supabaseAdmin";
 
 class UserService {
 
-    static createUser = async ({ id }: { id: string }) => {
+    static createUser = async (id : string) => {
         const now = new Date();
 
         const userData = await supabaseAdmin.auth.admin.getUserById(id);
 
         if (!userData) {
-            return null;
+            return {createdUser : null, newCreated : false};
         }
 
         // Check if user already exists
@@ -20,8 +20,7 @@ class UserService {
         });
 
         if (existingUser) {
-            console.log("Existing: ", existingUser);
-            return existingUser;
+            return {createdUser : existingUser, newCreated : false};
         }
 
         const user = await prisma.user.create({
@@ -35,7 +34,7 @@ class UserService {
             }
         });
         
-        return user;
+        return {createdUser : user, newCreated : true};
     };
 
 };
