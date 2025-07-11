@@ -1,12 +1,12 @@
 import prisma from "../utils/prismaClient";
 
 class DiagramService {
-    static create = async (userId: string) => {
-        if (!userId) {
+    static create = async (userSupabaseId: string) => {
+        if (!userSupabaseId) {
             throw new Error("User is required");
         }
         const user = await prisma.user.findUnique({
-            where: { supabaseId: userId }
+            where: { supabaseId: userSupabaseId }
         })
         if (!user) {
             throw new Error("User not found");
@@ -70,10 +70,19 @@ class DiagramService {
 
     };
 
-    static getUserDiagrams = async (userId: string) => {
-        if (!userId) {
+    static getUserDiagrams = async (userSupabaseId: string) => {
+        if (!userSupabaseId) {
             throw new Error("User ID is required");
         }
+        
+        const user = await prisma.user.findUnique({
+            where : {
+                supabaseId: userSupabaseId
+            }
+        });
+
+        const userId = user?.id;
+
         const userDiagrams = await prisma.diagram.findMany({
             where: {
                 userId: userId
