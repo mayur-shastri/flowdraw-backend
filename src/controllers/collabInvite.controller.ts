@@ -25,7 +25,7 @@ class CollabInviteController{
             res.status(401).json({message: "You are not logged in"});
             return;
         }
-        const invitations = CollabInviteService.getInvitations(user.id);
+        const invitations = await CollabInviteService.getInvitations(user.id);
         if(!invitations){
             res.status(400).json({message: "Failed to fetch the invitations"});
         }
