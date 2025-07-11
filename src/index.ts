@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import userRouter from './routes/user.route';
-import diagramRouter from './routes/diagram.routes';
+import diagramRouter from './routes/diagram.route';
 
 dotenv.config();
 const app = express();
@@ -16,9 +16,9 @@ app.use(express.json());
 
 app.use('/users', userRouter);
 app.use('/diagrams', diagramRouter);
+
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+  res.status(err.status || 500).json({ error: err.message || 'Something went wrong!' });
 });
 
 app.listen(PORT, () => {

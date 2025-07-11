@@ -15,24 +15,66 @@ datasource db {
 }
 
 model User {
-  id         String    @id @default(cuid())
-  email      String    @unique
-  name       String?
-  supabaseId String?   @unique
-  phone      String?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  Diagram    Diagram[]
+  id                     String                  @id @default(cuid())
+  email                  String                  @unique
+  name                   String?
+  supabaseId             String?                 @unique
+  phone                  String?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  diagrams               Diagram[]               @relation("Owner")
+  collaborations         Collaboration[]         @relation("UserCollaborations")
+  viewOnlyCollaborations ViewOnlyCollaboration[] @relation("UserViewOnlyCollaborations")
 }
 
 model Diagram {
-  id            String   @id @default(cuid())
-  userId        String
-  title         String
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  collaborators String[]
-  user          User     @relation(fields: [userId], references: [id])
-  elements      Json
-  version       Int      @default(1)
+  id                    String                  @id @default(cuid())
+  title                 String
+  userId                String
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  elements              Json
+  version               Int                     @default(1)
+  user                  User                    @relation("Owner", fields: [userId], references: [id])
+  collaborators         Collaboration[]         @relation("DiagramCollaborations")
+  viewOnlyCollaborators ViewOnlyCollaboration[] @relation("DiagramViewOnlyCollaborations")
+}
+
+model Collaboration {
+  userId    String
+  diagramId String
+  user      User    @relation("UserCollaborations", fields: [userId], references: [id], onDelete: Cascade)
+  diagram   Diagram @relation("DiagramCollaborations", fields: [diagramId], references: [id], onDelete: Cascade)
+
+  @@id([userId, diagramId])
+}
+
+model ViewOnlyCollaboration {
+  userId    String
+  diagramId String
+  user      User    @relation("UserViewOnlyCollaborations", fields: [userId], references: [id], onDelete: Cascade)
+  diagram   Diagram @relation("DiagramViewOnlyCollaborations", fields: [diagramId], references: [id], onDelete: Cascade)
+
+  @@id([userId, diagramId])
+}
+
+enum AccessLevel {
+  VIEW
+  EDIT
+}
+
+enum Status {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model CollabInvitation {
+  id          String      @id @default(cuid())
+  ownerId     String
+  diagramId   String
+  userId      String
+  accessLevel AccessLevel @default(VIEW)
+  createdAt   DateTime    @default(now())
+  status      Status      @default(PENDING)
 }
