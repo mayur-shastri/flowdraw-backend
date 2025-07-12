@@ -19,7 +19,9 @@ app.use('/invitations', invitationRouter);
 app.use('/users', userRouter);
 app.use('/diagrams', diagramRouter);
 
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.log("Hi");
+  console.error(err);
   res.status(err.status || 500).json({ error: err.message || 'Something went wrong!' });
 });
 

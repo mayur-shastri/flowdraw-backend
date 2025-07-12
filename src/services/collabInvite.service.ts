@@ -1,8 +1,9 @@
+import { getUserFromSupabaseId } from "../utils/getUserFromSupabaseId";
 import prisma from "../utils/prismaClient"
 
 class CollabInviteService {
-    static checkIfRequestedByOwner = async (inviterId: string, diagramId: string) => {
-        if (!diagramId || !inviterId) {
+    static checkIfRequestedByOwner = async (inviterSupabaseId: string, diagramId: string) => {
+        if (!diagramId || !inviterSupabaseId) {
             throw new Error("Diagram ID or Inviter ID is invalid");
         }
 
@@ -12,15 +13,7 @@ class CollabInviteService {
             }
         });
 
-        const user = await prisma.user.findUnique({
-            where: {
-                id: inviterId
-            }
-        });
-
-        if (!user) {
-            throw new Error("User not found");
-        }
+        const user = await getUserFromSupabaseId(inviterSupabaseId);
 
         if (!diagram) {
             throw new Error("Diagram not found");
@@ -37,9 +30,9 @@ class CollabInviteService {
     static createInvite = async (
         inviterId: string,
         diagramId: string,
-        inviteeId: string,
+        email: string,
         access: string) => {
-        if (!inviterId || !diagramId || !inviteeId || !access) {
+        if (!inviterId || !diagramId || !email || !access) {
             throw new Error("Could not send the invite");
         }
 
@@ -47,15 +40,34 @@ class CollabInviteService {
             throw new Error("Invalid level of access provided");
         }
 
-        const inviter = await prisma.user.findUnique({
+        const invitee = await prisma.user.findUnique({
             where: {
-                supabaseId: inviterId
+                email: email.toString().trim()
             }
         });
 
-        if (!inviter) {
-            throw new Error("Inviter not found");
+        if (!invitee) {
+            throw new Error("User not found");
         }
+
+        const existingInvite = await prisma.collabInvitation.findFirst({
+            where: {
+                ownerId: inviterId,
+                diagramId,
+                userId: invitee.id,
+                accessLevel: access === 'VIEW' ? "VIEW" : "EDIT"
+            }
+        });
+
+        if (existingInvite) {
+            const updatedInvite = await prisma.collabInvitation.update({
+                where: { id: existingInvite.id },
+                data: { createdAt: new Date() }
+            });
+            return updatedInvite;
+        }
+
+        const inviter = await getUserFromSupabaseId(inviterId);
 
         const now = new Date();
 
@@ -63,7 +75,7 @@ class CollabInviteService {
             data: {
                 ownerId: inviter.id,
                 diagramId,
-                userId: inviteeId,
+                userId: invitee.id,
                 createdAt: now,
                 accessLevel: access === 'VIEW' ? "VIEW" : "EDIT"
             }
@@ -73,21 +85,9 @@ class CollabInviteService {
 
     };
 
-    static getInvitations = async (userSupabaseId: string) => {
+    static getAllUserInvitations = async (userSupabaseId: string) => {
 
-        if (!userSupabaseId) {
-            throw new Error("Invalid User ID");
-        }
-
-        const user = await prisma.user.findUnique({
-            where: {
-                supabaseId: userSupabaseId
-            }
-        });
-
-        if (!user) {
-            throw new Error("User not found");
-        }
+        const user = await getUserFromSupabaseId(userSupabaseId);
 
         // Fetch invitations with only ids and relevant fields
         const invitations = await prisma.collabInvitation.findMany({
@@ -161,6 +161,113 @@ class CollabInviteService {
                 status: invite.status
             };
         });
+    };
+
+    static getUserInvitationsByStatus = async (userSupabaseId: string, status: string) => {
+
+        const user = await getUserFromSupabaseId(userSupabaseId);
+
+        console.log(status);
+
+        // Fetch invitations with only ids and relevant fields
+        const invitations = await prisma.collabInvitation.findMany({
+            where: {
+                userId: user.id,
+                status: status === 'PENDING' ? 'PENDING' : (status === 'ACCEPTED' ? 'ACCEPTED' : 'REJECTED')
+            },
+            select: {
+                id: true,
+                ownerId: true,
+                diagramId: true,
+                createdAt: true,
+                accessLevel: true,
+                status: true
+            }
+        });
+
+        console.log(invitations);
+
+        // Fetch all unique ownerIds and diagramIds
+        const ownerIds = [...new Set(invitations.map(invite => invite.ownerId))];
+        const diagramIds = [...new Set(invitations.map(invite => invite.diagramId))];
+
+        // Fetch all owners in one query
+        const owners = await prisma.user.findMany({
+            where: {
+                id: { in: ownerIds }
+            },
+            select: {
+                id: true,
+                name: true,
+                email: true
+            }
+        });
+
+        // Fetch all diagrams in one query
+        const diagrams = await prisma.diagram.findMany({
+            where: {
+                id: { in: diagramIds }
+            },
+            select: {
+                id: true,
+                title: true,
+                collaborators: { select: { userId: true } },
+                viewOnlyCollaborators: { select: { userId: true } }
+            }
+        });
+
+        // Map ownerId and diagramId to their info
+        const ownerMap = new Map(owners.map(owner => [owner.id, { name: owner.name, email: owner.email }]));
+        const diagramMap = new Map(diagrams.map(diagram => [
+            diagram.id,
+            {
+                id: diagram.id,
+                title: diagram.title,
+                collaboratorsCount: diagram.collaborators.length + diagram.viewOnlyCollaborators.length
+            }
+        ]));
+
+        // Map to summary format
+        return invitations.map(invite => {
+            const diagram = diagramMap.get(invite.diagramId) || { id: null, title: null, collaboratorsCount: 0 };
+            return {
+                id: invite.id,
+                inviter: ownerMap.get(invite.ownerId) || { name: null, email: null },
+                diagram: {
+                    id: diagram.id,
+                    title: diagram.title
+                },
+                collaborators: diagram.collaboratorsCount,
+                invitedAt: invite.createdAt.toISOString(),
+                expiresAt: null, // Not present in schema
+                accessLevel: invite.accessLevel,
+                status: invite.status
+            };
+        });
+    };
+
+    static countByStatus = async (userId: string, status: string) => {
+        return await prisma.collabInvitation.count({
+            where: {
+                userId: userId,
+                status: status === 'PENDING' ? 'PENDING' : (status === 'ACCEPTED' ? 'ACCEPTED' : 'REJECTED')
+            }
+        });
+    };
+
+    static getUserInvitationsCount = async (userSupabaseId: string) => {
+        const user = await getUserFromSupabaseId(userSupabaseId);
+        const countAll = await prisma.collabInvitation.count({
+            where: {
+                userId: user.id
+            }
+        });
+
+        const countPending = await this.countByStatus(user.id, "PENDING");
+        const countAccepted = await this.countByStatus(user.id, "ACCEPTED");
+        const countRejected = await this.countByStatus(user.id, "REJECTED");
+
+        return { countAll, countPending, countAccepted, countRejected };
     };
 
     static updateInvitationStatus = async (userSupabaseId: string, invitationId: string, accept: boolean) => {
