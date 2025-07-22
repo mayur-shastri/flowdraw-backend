@@ -49,8 +49,8 @@ class DiagramController {
     static updateDiagram = expressAsyncHandler(async (req: AuthenticatedRequest, res: Response)=>{
         const user = req.user;
         const {id} = req.params;
-        const {updatedElements, updatedConnections, version} = req.body;
-        const updatedDiagram = await DiagramService.updateDiagram(user.id, id, updatedElements, updatedConnections, version);
+        const {updatedElements, updatedConnections} = req.body;
+        const updatedDiagram = await DiagramService.updateDiagram(user.id, id, updatedElements, updatedConnections);
         if(!updatedDiagram){
             res.status(400).json({ error: "Failed to save diagram" });
             return;

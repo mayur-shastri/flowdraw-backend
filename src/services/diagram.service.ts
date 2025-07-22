@@ -110,7 +110,7 @@ class DiagramService {
 
     };
 
-    static updateDiagram = async (userSupabaseId: string, diagramId: string, updatedElements: Array<any>, updatedConnections: Array<any>, version: number) => {
+    static updateDiagram = async (userSupabaseId: string, diagramId: string, updatedElements: Array<any>, updatedConnections: Array<any>) => {
         const user = await getUserFromSupabaseId(userSupabaseId);
         const diagram = await prisma.diagram.findUnique({
             where: {
@@ -123,19 +123,14 @@ class DiagramService {
             throw new Error("Diagram not found");
         }
 
-        if (version <= diagram.version) {
-            throw new Error("Outdated diagram version");
-        }
-
         const updatedDiagram = await prisma.diagram.update({
             where: {
                 id: diagramId,
                 userId: user.id
             },
             data: {
-                elements: updatedElements,
-                connections: updatedConnections,
-                version: version
+                elements: updatedElements || [],
+                connections: updatedConnections  || [],
             }
         });
 

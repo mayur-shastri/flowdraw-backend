@@ -34,7 +34,6 @@ model Diagram {
   updatedAt     DateTime        @updatedAt
   elements      Json
   connections   Json
-  version       Int             @default(1)
   user          User            @relation("Owner", fields: [userId], references: [id])
   collaborators Collaboration[] @relation("DiagramCollaborations")
 }
