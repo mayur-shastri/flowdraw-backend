@@ -1,24 +1,21 @@
+import { getUserFromSupabaseId } from "../utils/getUserFromSupabaseId";
 import prisma from "../utils/prismaClient";
 
 class DiagramService {
+
     static create = async (userSupabaseId: string) => {
-        if (!userSupabaseId) {
-            throw new Error("User is required");
-        }
-        const user = await prisma.user.findUnique({
-            where: { supabaseId: userSupabaseId }
-        })
-        if (!user) {
-            throw new Error("User not found");
-        }
+        const user = await getUserFromSupabaseId(userSupabaseId);
         const now = new Date();
+        const id = crypto.randomUUID().slice(0, 8);
+        const title = `Untitled_Diagram_${id}`;
         const diagram = await prisma.diagram.create({
             data: {
-                title: `Untitled_Diagram_${now}`,
+                title: title,
                 userId: user.id,
                 createdAt: now,
                 updatedAt: now,
                 elements: [],
+                connections: []
             }
         });
 
@@ -26,15 +23,17 @@ class DiagramService {
 
     };
 
-    static getDiagram = async (id: string, diagramId: string) => {
-        if (!id || !diagramId) {
+    static getDiagram = async (userSupabaseId: string, diagramId: string) => {
+        if (!userSupabaseId || !diagramId) {
             throw new Error("User ID and Diagram ID are required");
         }
+
+        const user = await getUserFromSupabaseId(userSupabaseId);
 
         const diagram = await prisma.diagram.findUnique({
             where: {
                 id: diagramId,
-                userId: id
+                userId: user.id
             }
         });
 
@@ -42,27 +41,18 @@ class DiagramService {
             throw new Error("Diagram not found");
         }
 
-        if(diagram.userId === id) return diagram;
+        if (diagram.userId === user.id) return diagram;
 
         const collaboration = await prisma.collaboration.findUnique({
             where: {
                 userId_diagramId: {
-                    userId: id,
+                    userId: user.id,
                     diagramId: diagramId
                 }
             }
         });
 
-        const viewOnlyCollaboration = await prisma.viewOnlyCollaboration.findUnique({
-            where: {
-                userId_diagramId: {
-                    userId: id,
-                    diagramId: diagramId
-                }
-            }
-        });
-
-        if (!collaboration && !viewOnlyCollaboration) {
+        if (!collaboration) {
             throw new Error("You do not have access to this diagram");
         }
 
@@ -71,27 +61,21 @@ class DiagramService {
     };
 
     static getUserDiagrams = async (userSupabaseId: string) => {
-        if (!userSupabaseId) {
-            throw new Error("User ID is required");
-        }
-        
-        const user = await prisma.user.findUnique({
-            where : {
-                supabaseId: userSupabaseId
-            }
-        });
 
-        const userId = user?.id;
+        const user = await getUserFromSupabaseId(userSupabaseId);
 
         const userDiagrams = await prisma.diagram.findMany({
             where: {
-                userId: userId
+                userId: user.id
             },
             select: {
                 id: true,
                 title: true,
                 createdAt: true,
                 updatedAt: true,
+            },
+            orderBy: {
+                createdAt: 'desc'
             }
         });
 
@@ -99,16 +83,15 @@ class DiagramService {
 
     };
 
-    static getUserCollaborations = async (userId: string) => {
-        if (!userId) {
-            throw new Error("User ID is required");
-        }
+    static getUserCollaborations = async (userSupabaseId: string) => {
+
+        const user = await getUserFromSupabaseId(userSupabaseId);
 
         const userCollaborations = await prisma.diagram.findMany({
             where: {
                 collaborators: {
                     some: {
-                        userId: userId
+                        userId: user.id
                     }
                 }
             },
@@ -117,6 +100,9 @@ class DiagramService {
                 title: true,
                 createdAt: true,
                 updatedAt: true,
+            },
+            orderBy: {
+                createdAt: 'desc'
             }
         });
 
@@ -124,29 +110,36 @@ class DiagramService {
 
     };
 
-    static getUserViewOnlyDiagrams = async (userId: string) => {
-        if (!userId) {
-            throw new Error("User ID is required");
-        }
-
-        const viewOnlyCollaborations = await prisma.diagram.findMany({
+    static updateDiagram = async (userSupabaseId: string, diagramId: string, updatedElements: Array<any>, updatedConnections: Array<any>, version: number) => {
+        const user = await getUserFromSupabaseId(userSupabaseId);
+        const diagram = await prisma.diagram.findUnique({
             where: {
-                viewOnlyCollaborators: {
-                    some: {
-                        userId: userId
-                    }
-                }
-            },
-            select: {
-                id: true,
-                title: true,
-                createdAt: true,
-                updatedAt: true,
+                id: diagramId,
+                userId: user.id,
             }
         });
 
-        return viewOnlyCollaborations;
+        if (!diagram) {
+            throw new Error("Diagram not found");
+        }
 
+        if (version <= diagram.version) {
+            throw new Error("Outdated diagram version");
+        }
+
+        const updatedDiagram = await prisma.diagram.update({
+            where: {
+                id: diagramId,
+                userId: user.id
+            },
+            data: {
+                elements: updatedElements,
+                connections: updatedConnections,
+                version: version
+            }
+        });
+
+        return updatedDiagram;
     };
 
 };

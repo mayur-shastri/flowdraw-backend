@@ -50,24 +50,25 @@ class CollabInviteService {
             throw new Error("User not found");
         }
 
+        const inviter = await getUserFromSupabaseId(inviterId);
+
         const existingInvite = await prisma.collabInvitation.findFirst({
             where: {
-                ownerId: inviterId,
+                ownerId: inviter.id,
                 diagramId,
                 userId: invitee.id,
                 accessLevel: access === 'VIEW' ? "VIEW" : "EDIT"
             }
         });
 
-        if (existingInvite) {
-            const updatedInvite = await prisma.collabInvitation.update({
-                where: { id: existingInvite.id },
-                data: { createdAt: new Date() }
-            });
-            return updatedInvite;
+        const existingInviteDate = existingInvite?.createdAt;
+        const sevenDays = 7 * 24 * 60 * 60 * 1000;
+        if (existingInvite &&
+            existingInviteDate &&
+            new Date(existingInviteDate).getTime() + sevenDays > Date.now() &&
+            existingInvite.status === "PENDING") {
+            throw new Error("An invite has already been sent");
         }
-
-        const inviter = await getUserFromSupabaseId(inviterId);
 
         const now = new Date();
 
@@ -129,7 +130,6 @@ class CollabInviteService {
                 id: true,
                 title: true,
                 collaborators: { select: { userId: true } },
-                viewOnlyCollaborators: { select: { userId: true } }
             }
         });
 
@@ -140,7 +140,7 @@ class CollabInviteService {
             {
                 id: diagram.id,
                 title: diagram.title,
-                collaboratorsCount: diagram.collaborators.length + diagram.viewOnlyCollaborators.length
+                collaboratorsCount: diagram.collaborators.length
             }
         ]));
 
@@ -167,8 +167,6 @@ class CollabInviteService {
 
         const user = await getUserFromSupabaseId(userSupabaseId);
 
-        console.log(status);
-
         // Fetch invitations with only ids and relevant fields
         const invitations = await prisma.collabInvitation.findMany({
             where: {
@@ -184,8 +182,6 @@ class CollabInviteService {
                 status: true
             }
         });
-
-        console.log(invitations);
 
         // Fetch all unique ownerIds and diagramIds
         const ownerIds = [...new Set(invitations.map(invite => invite.ownerId))];
@@ -212,7 +208,6 @@ class CollabInviteService {
                 id: true,
                 title: true,
                 collaborators: { select: { userId: true } },
-                viewOnlyCollaborators: { select: { userId: true } }
             }
         });
 
@@ -223,7 +218,7 @@ class CollabInviteService {
             {
                 id: diagram.id,
                 title: diagram.title,
-                collaboratorsCount: diagram.collaborators.length + diagram.viewOnlyCollaborators.length
+                collaboratorsCount: diagram.collaborators.length
             }
         ]));
 
@@ -308,26 +303,33 @@ class CollabInviteService {
             }
         });
 
+
         if (accept) {
-            if (invitation.accessLevel === "EDIT") {
-                await prisma.collaboration.create({
-                    data: {
-                        userId: user.id,
-                        diagramId: invitation.diagramId,
+            await prisma.collaboration.create({
+                data: {
+                    userId: user.id,
+                    diagramId: invitation.diagramId,
+                    accessLevel: invitation.accessLevel
+                }
+            });
+
+            await prisma.user.update({
+                where: {
+                    id: user.id
+                },
+                data: {
+                    collaborations : {
+                        create: {
+                            diagramId: invitation.diagramId,
+                            accessLevel: invitation.accessLevel
+                        }
                     }
-                });
-            } else if (invitation.accessLevel === "VIEW") {
-                await prisma.viewOnlyCollaboration.create({
-                    data: {
-                        userId: user.id,
-                        diagramId: invitation.diagramId,
-                    }
-                });
-            }
+                }
+            });
+
         }
 
         return updatedInvitation;
-
     };
 
 }

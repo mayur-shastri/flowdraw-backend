@@ -9,7 +9,7 @@ router.get('/get/:id', authMiddleware, DiagramController.getDiagram);
 router.get('/get-diagrams', authMiddleware, DiagramController.getUserDiagrams);
 // route to get basic data of diagrams where the user is a collaborator
 router.get('/get-collaborations', authMiddleware, DiagramController.getUserCollaborations);
-// route to get basic data of diagrams where the user has view-only access
-router.get('/get-viewonly-diagrams', authMiddleware, DiagramController.getUserViewOnlyDiagrams);
+// route to save a diagram
+router.patch('/:id/update', authMiddleware, DiagramController.updateDiagram);
 
 export default router;

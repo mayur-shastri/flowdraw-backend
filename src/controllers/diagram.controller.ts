@@ -45,15 +45,17 @@ class DiagramController {
         }
         res.status(200).json(collaborations);
     });
-    
-    static getUserViewOnlyDiagrams = expressAsyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+
+    static updateDiagram = expressAsyncHandler(async (req: AuthenticatedRequest, res: Response)=>{
         const user = req.user;
-        const viewOnlydiagrams = await DiagramService.getUserViewOnlyDiagrams(user.id);
-        if (!viewOnlydiagrams) {
-            res.status(404).json({ error: "No view-only diagrams found" });
+        const {id} = req.params;
+        const {updatedElements, updatedConnections, version} = req.body;
+        const updatedDiagram = await DiagramService.updateDiagram(user.id, id, updatedElements, updatedConnections, version);
+        if(!updatedDiagram){
+            res.status(400).json({ error: "Failed to save diagram" });
             return;
         }
-        res.status(200).json(viewOnlydiagrams);
+        res.status(200).json({updatedDiagram, message: "Diagram saved successfully"});
     });
 
 };
