@@ -313,20 +313,6 @@ class CollabInviteService {
                 }
             });
 
-            await prisma.user.update({
-                where: {
-                    id: user.id
-                },
-                data: {
-                    collaborations : {
-                        create: {
-                            diagramId: invitation.diagramId,
-                            accessLevel: invitation.accessLevel
-                        }
-                    }
-                }
-            });
-
         }
 
         return updatedInvitation;

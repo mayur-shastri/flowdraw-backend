@@ -37,26 +37,24 @@ class DiagramService {
             }
         });
 
-        if (!diagram) {
-            throw new Error("Diagram not found");
-        }
+        if (diagram && diagram.userId === user.id) return diagram;
 
-        if (diagram.userId === user.id) return diagram;
-
-        const collaboration = await prisma.collaboration.findUnique({
-            where: {
-                userId_diagramId: {
-                    userId: user.id,
-                    diagramId: diagramId
+        const collaborationDiagram = await prisma.diagram.findUnique({
+            where : {
+                id : diagramId,
+                collaborators: {
+                    some: {
+                        userId: user.id
+                    }
                 }
             }
         });
 
-        if (!collaboration) {
+        if (!collaborationDiagram) {
             throw new Error("You do not have access to this diagram");
         }
 
-        return diagram;
+        return collaborationDiagram;
 
     };
 
