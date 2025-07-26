@@ -64,7 +64,7 @@ class SocketHandler {
                     const { data, error } = await supabaseAdmin.auth.getUser(token);
 
                     if (error) {
-                        throw new Error("Failed to join the socket server");
+                        return;
                     }
 
                     // Send own ID + other peers
