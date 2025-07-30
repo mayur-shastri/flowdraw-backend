@@ -40,8 +40,8 @@ class DiagramService {
         if (diagram && diagram.userId === user.id) return diagram;
 
         const collaborationDiagram = await prisma.diagram.findUnique({
-            where : {
-                id : diagramId,
+            where: {
+                id: diagramId,
                 collaborators: {
                     some: {
                         userId: user.id
@@ -108,7 +108,13 @@ class DiagramService {
 
     };
 
-    static updateDiagram = async (userSupabaseId: string, diagramId: string, updatedElements: Array<any>, updatedConnections: Array<any>) => {
+    static updateDiagram = async (
+        userSupabaseId: string,
+        diagramId: string,
+        updatedElements: Array<any>,
+        updatedConnections: Array<any>,
+        updatedTitle: string
+    ) => {
         const user = await getUserFromSupabaseId(userSupabaseId);
         const diagram = await prisma.diagram.findUnique({
             where: {
@@ -128,7 +134,8 @@ class DiagramService {
             },
             data: {
                 elements: updatedElements || [],
-                connections: updatedConnections  || [],
+                connections: updatedConnections || [],
+                title: updatedTitle || diagram.title
             }
         });
 
