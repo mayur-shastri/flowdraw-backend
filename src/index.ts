@@ -1,7 +1,7 @@
-import express from 'express';
-import cors from 'cors';
 import dotenv from 'dotenv';
 dotenv.config();
+import cors from 'cors';
+import express from 'express';
 import userRouter from './routes/user.route';
 import diagramRouter from './routes/diagram.route';
 import invitationRouter from './routes/collabInvite.route';
