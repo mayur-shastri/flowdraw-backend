@@ -18,9 +18,14 @@ socketHandlerInstance.initialize(io);
 
 const PORT = process.env.PORT || 5000;
 
-app.use(cors({
+const corsConfig = {
   origin: process.env.FRONTEND_URL,
-}));
+  credentials: true,
+  sameSite: "none",
+  secure: true,
+};
+
+app.use(cors(corsConfig));
 
 app.use(express.json());
 
