@@ -24,6 +24,10 @@ app.use(cors({
 
 app.use(express.json());
 
+app.get('/', (req, res)=>{
+  res.send('Hello World');
+});
+
 app.use('/invitations', invitationRouter);
 app.use('/users', userRouter);
 app.use('/diagrams', diagramRouter);
