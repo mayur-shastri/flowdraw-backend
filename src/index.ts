@@ -18,14 +18,22 @@ socketHandlerInstance.initialize(io);
 
 const PORT = process.env.PORT || 5000;
 
-const corsConfig = {
-  origin: process.env.FRONTEND_URL,
-  credentials: true,
-  sameSite: "none",
-  secure: true,
-};
+const allowedOrigins = [
+"https://flowdraw.bytebuilderz.xyz",
+"https://www.flowdraw.bytebuilderz.xyz"
+];
 
-app.use(cors(corsConfig));
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+  credentials: true
+}));
 
 app.use(express.json());
 
