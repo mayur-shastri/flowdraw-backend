@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+dotenv.config();
 import userRouter from './routes/user.route';
 import diagramRouter from './routes/diagram.route';
 import invitationRouter from './routes/collabInvite.route';
@@ -8,7 +9,6 @@ import http from 'http';
 import {Server} from 'socket.io';
 import socketHandlerInstance from './webrtc-signaling/SocketHandler';
 
-dotenv.config();
 const app = express();
 
 const server = http.createServer(app);
