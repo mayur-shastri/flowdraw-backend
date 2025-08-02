@@ -43,7 +43,8 @@ class SocketHandler {
                 socket.on('join', async ({ diagramId, token }) => {
                     const { data, error } = await supabaseAdmin.auth.getUser(token);
 
-                    if (error) {
+                    if (error || !data?.user) {
+                        socket.emit("auth-error", { message: "Invalid token" });
                         return;
                     }
 
