@@ -37,17 +37,20 @@ class SocketHandler {
         try {
             this.io = io;
 
-            io.on('connection', (socket) => {
+            io.on('connection', async (socket) => {
                 const peerId = uuidv4();
 
                 socket.on('join', async ({ diagramId, token }) => {
                     const { data, error } = await supabaseAdmin.auth.getUser(token);
-
+                    
                     if (error || !data?.user) {
+                        console.log("Authentication error:", error);
                         socket.emit("auth-error", { message: "Invalid token" });
                         return;
                     }
 
+                    console.log("Success: ", data.user.user_metadata.name);
+                    
                     socket.join(diagramId);
                     this.socketMeta[socket.id] = { peerId, diagramId };
 
