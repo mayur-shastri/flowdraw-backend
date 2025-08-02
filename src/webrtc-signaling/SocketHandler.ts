@@ -41,6 +41,12 @@ class SocketHandler {
                 const peerId = uuidv4();
 
                 socket.on('join', async ({ diagramId, token }) => {
+                    const { data, error } = await supabaseAdmin.auth.getUser(token);
+
+                    if (error) {
+                        return;
+                    }
+
                     socket.join(diagramId);
                     this.socketMeta[socket.id] = { peerId, diagramId };
 
@@ -59,12 +65,6 @@ class SocketHandler {
                     } else {
                         const idx = Math.round(Math.random() * availableColors.length) % availableColors.length;
                         color = availableColors[idx];
-                    }
-
-                    const { data, error } = await supabaseAdmin.auth.getUser(token);
-
-                    if (error) {
-                        return;
                     }
 
                     // Send own ID + other peers
