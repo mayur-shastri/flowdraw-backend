@@ -124,6 +124,20 @@ class DiagramService {
         });
 
         if (!diagram) {
+            const collabDiagram = await prisma.diagram.findUnique({
+                where: {
+                    id: diagramId,
+                    collaborators: {
+                        some: {
+                            userId: user.id
+                        }
+                    }
+                }
+            });
+            if (collabDiagram) {
+                // If the diagram is found in collaborations, return it
+                return collabDiagram;
+            }
             throw new Error("Diagram not found");
         }
 
