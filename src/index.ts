@@ -5,6 +5,7 @@ import express from 'express';
 import userRouter from './routes/user.route';
 import diagramRouter from './routes/diagram.route';
 import invitationRouter from './routes/collabInvite.route';
+import turnRouter from './routes/turn.route';
 import http from 'http';
 import {Server} from 'socket.io';
 import socketHandlerInstance from './webrtc-signaling/SocketHandler';
@@ -44,7 +45,7 @@ app.get('/', (req, res)=>{
 app.use('/invitations', invitationRouter);
 app.use('/users', userRouter);
 app.use('/diagrams', diagramRouter);
-
+app.use('/turn', turnRouter);
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   res.status(err.status || 500).json({ error: err.message || 'Something went wrong!' });
 });
