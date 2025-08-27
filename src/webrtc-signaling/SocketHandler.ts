@@ -80,7 +80,7 @@ class SocketHandler {
                     });
 
                     // Notify other peers
-                    socket.to(diagramId).emit('new-peer', { peerId });
+                    socket.to(diagramId).emit('new-peer', { peerId, peerName: data.user.user_metadata.name });
                 });
 
                 socket.on('signal', ({ to, from, signalType, data }) => {
