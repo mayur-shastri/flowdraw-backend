@@ -1,10 +1,7 @@
 import { Server } from 'socket.io';
 import { v4 as uuidv4 } from 'uuid';
 import supabaseAdmin from '../utils/supabaseAdmin';
-
-type RoomPeers = Record<string, Record<string, string>>; // diagramId -> peerId -> socketId
-type SocketMeta = Record<string, { peerId: string; diagramId: string }>;
-type RoomColors = Record<string, Set<string>>;
+import { createClient, RedisClientType } from 'redis';
 
 const availableColors = [
     'hsl(0, 70%, 50%)',
@@ -23,17 +20,22 @@ const availableColors = [
 
 class SocketHandler {
 
-    private roomPeers: RoomPeers = {};
-    private socketMeta: SocketMeta = {};
-    private roomColors: RoomColors = {};
+    private redis: RedisClientType;
 
     private io: Server | null = null;
+
+
     constructor() {
-        this.roomPeers = {}; // { diagramId: { peerId: socketId } }
-        this.socketMeta = {}; // { socketId: { peerId, diagramId } }
+        this.redis = createClient({
+            url: process.env.REDIS_URL
+        });
+        this.redis.on("error", (err) => {
+            console.error("Redis error:", err);
+        });
     }
 
-    initialize(io: Server) {
+    async initialize(io: Server) {
+        await this.redis.connect();
         try {
             this.io = io;
 
@@ -42,7 +44,7 @@ class SocketHandler {
 
                 socket.on('join', async ({ diagramId, token }) => {
                     const { data, error } = await supabaseAdmin.auth.getUser(token);
-                    
+
                     if (error || !data?.user) {
                         console.log("Authentication error:", error);
                         socket.emit("auth-error", { message: "Invalid token" });
@@ -50,43 +52,45 @@ class SocketHandler {
                     }
 
                     console.log("Success: ", data.user.user_metadata.name);
-                    
+
                     socket.join(diagramId);
-                    this.socketMeta[socket.id] = { peerId, diagramId };
+                    this.redis.hSet(`socket:${socket.id}`, {
+                        peerId,
+                        diagramId,
+                    });
 
-                    if (!this.roomPeers[diagramId]) this.roomPeers[diagramId] = {};
-                    this.roomPeers[diagramId][peerId] = socket.id;
-
-                    if (!this.roomColors[diagramId]) this.roomColors[diagramId] = new Set();
+                    await this.redis.hSet(`room:${diagramId}`, peerId, socket.id);
 
                     let color: string;
 
-                    const usedColors = this.roomColors[diagramId];
+                    const usedColors = await this.redis.sMembers(`roomColors:${diagramId}`);
 
-                    if (usedColors.size < availableColors.length) {
-                        color = availableColors.find(c => !usedColors.has(c))!;
-                        usedColors.add(color);
+                    if (usedColors.length < availableColors.length) {
+                        color = availableColors.find(c => !usedColors.includes(c))!; // check array, not Set
                     } else {
-                        const idx = Math.round(Math.random() * availableColors.length) % availableColors.length;
+                        const idx = Math.floor(Math.random() * availableColors.length);
                         color = availableColors[idx];
                     }
 
+                    await this.redis.sAdd(`roomColors:${diagramId}`, color);
+
                     // Send own ID + other peers
+                    const peersInRoom = await this.redis.hGetAll(`room:${diagramId}`);
+                    const peerIds = Object.keys(peersInRoom).filter(id => id !== peerId);
                     socket.emit('joined', {
                         peerId,
                         peerColor: color,
                         peerName: data.user.user_metadata.name,
-                        peers: Object.keys(this.roomPeers[diagramId]).filter(id => id !== peerId)
+                        peers: peerIds
                     });
 
                     // Notify other peers
                     socket.to(diagramId).emit('new-peer', { peerId, peerName: data.user.user_metadata.name });
                 });
 
-                socket.on('signal', ({ to, from, signalType, data }) => {
-                    const diagramId = this.socketMeta[socket.id]?.diagramId;
-                    const targetSocketId = this.roomPeers[diagramId]?.[to];
-
+                socket.on('signal', async ({ to, from, signalType, data }) => {
+                    const diagramId = await this.redis.hGet(`socket:${socket.id}`, 'diagramId');
+                    const targetSocketId = await this.redis.hGet(`room:${diagramId}`, to);
                     if (targetSocketId) {
                         this.io!.to(targetSocketId).emit('signal', {
                             from,
@@ -96,21 +100,17 @@ class SocketHandler {
                     }
                 });
 
-                socket.on('disconnect', () => {
-                    const meta = this.socketMeta[socket.id];
-                    if (!meta) return;
+                socket.on('disconnect', async () => {
+                    const meta = await this.redis.hGetAll(`socket:${socket.id}`);
+                    if (!meta || !meta.peerId || !meta.diagramId) return;
 
                     const { peerId, diagramId } = meta;
 
-                    delete this.socketMeta[socket.id];
-                    delete this.roomPeers[diagramId]?.[peerId];
-                    delete this.roomColors[diagramId];
+                    await this.redis.del(`socket:${socket.id}`);
+                    await this.redis.hDel(`room:${diagramId}`, peerId);
+                    await this.redis.sRem(`roomColors:${diagramId}`, peerId);
 
                     socket.to(diagramId).emit('peer-left', { peerId });
-
-                    if (Object.keys(this.roomPeers[diagramId] || {}).length === 0) {
-                        delete this.roomPeers[diagramId];
-                    }
                 });
             });
         } catch (err) {
