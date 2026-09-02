@@ -10,6 +10,7 @@ COPY tsconfig.json ./
 COPY src ./src
 COPY prisma ./prisma
 
+RUN npx prisma generate
 RUN npm run build
 
 
@@ -25,6 +26,7 @@ RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/generated ./generated
 
 EXPOSE 3000
 
